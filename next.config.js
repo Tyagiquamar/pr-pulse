@@ -1,17 +1,12 @@
 module.exports = {
-  // Keep image optimization unrequirement so the project can run without a Next server when needed
+  // Keep this config Vercel-friendly: do not force static export here.
+  typescript: {
+    // Keep parity with next.config.mjs
+    ignoreBuildErrors: true,
+  },
   images: {
+    // You can enable Next.js image optimization on Vercel by setting this to false,
+    // but leaving unoptimized:true is safe if you prefer not to use Next's image optimizer.
     unoptimized: true,
   },
-
-  // Enable static export only when GH_PAGES env var is set to 'true' (used by GitHub Pages workflow)
-  // This avoids forcing an export during regular deploys (e.g., Vercel) where API routes are required.
-  ...(process.env.GH_PAGES === 'true'
-    ? {
-        basePath: '/pr-pulse',
-        assetPrefix: '/pr-pulse/',
-        trailingSlash: true,
-        output: 'export',
-      }
-    : {}),
 }
