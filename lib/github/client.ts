@@ -23,10 +23,10 @@ type Commit = { sha: string; html_url: string; commit: { message: string; author
 
 const API = 'https://api.github.com'
 const cache = new Map<string, { expires: number; data: NormalizedPullRequest[] }>()
-let inFlight: Promise<NormalizedPullRequest[]> | null = null
+const inFlight = new Map<string, Promise<NormalizedPullRequest[]>>()
 
 async function github<T>(path: string, token: string): Promise<T> {
-  const response = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }, next: { revalidate: 60 } as any })
+  const response = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }, next: { revalidate: 60 } })
   if (!response.ok) throw new Error(`GitHub request failed (${response.status})`)
   return response.json() as Promise<T>
 }
@@ -60,8 +60,9 @@ export async function fetchPullRequests(config: GitHubConfig, force = false) {
   const key = `${config.username}:${[...config.excludedOwners].join(',')}:${[...config.excludedRepos].join(',')}`
   const cached = cache.get(key)
   if (!force && cached && cached.expires > Date.now()) return cached.data
-  if (inFlight) return inFlight
-  inFlight = (async () => {
+  const pending = inFlight.get(key)
+  if (pending) return pending
+  const request = (async () => {
     // Use Search API paginator for discovery
     const searchPath = `/search/issues?q=author:${encodeURIComponent(config.username)}+type:pr`
     const searchResults = await getSearchResults<{
@@ -143,7 +144,6 @@ export async function fetchPullRequests(config: GitHubConfig, force = false) {
       } catch (err) {
         // Continue on individual item errors; do not fail the whole discovery
         // Log minimal info in environments that capture console output
-        // eslint-disable-next-line no-console
         console.warn('Failed to process search item', { item, reason: err instanceof Error ? err.message : String(err) })
         continue
       }
@@ -153,5 +153,6 @@ export async function fetchPullRequests(config: GitHubConfig, force = false) {
     cache.set(key, { expires: Date.now() + 60_000, data: normalized })
     return normalized
   })()
-  try { return await inFlight } finally { inFlight = null }
+  inFlight.set(key, request)
+  try { return await request } finally { inFlight.delete(key) }
 }
