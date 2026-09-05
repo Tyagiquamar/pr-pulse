@@ -1,13 +1,17 @@
 module.exports = {
-  // If hosting at https://<user>.github.io/pr-pulse set basePath and assetPrefix
-  // Adjust or remove these if you use a custom domain or user/organization site.
-  basePath: '/pr-pulse',
-  assetPrefix: '/pr-pulse/',
-  trailingSlash: true,
-  // Prevent Next.js image optimization from requiring a server at runtime
+  // Keep image optimization unrequirement so the project can run without a Next server when needed
   images: {
     unoptimized: true,
   },
-  // Ensure static export output when possible
-  output: 'export'
-};
+
+  // Enable static export only when GH_PAGES env var is set to 'true' (used by GitHub Pages workflow)
+  // This avoids forcing an export during regular deploys (e.g., Vercel) where API routes are required.
+  ...(process.env.GH_PAGES === 'true'
+    ? {
+        basePath: '/pr-pulse',
+        assetPrefix: '/pr-pulse/',
+        trailingSlash: true,
+        output: 'export',
+      }
+    : {}),
+}
